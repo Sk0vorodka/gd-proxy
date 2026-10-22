@@ -3,11 +3,11 @@
 	"gd": {
 		"win": "*"
 	},
-	"version": "v1.0.0",
+	"version": "v1.0.1",
 	"id": "artem.gd-proxy",
 	"name": "GD Proxy Helper",
 	"developer": "artem",
-	"description": "Routes all Geometry Dash downloads (levels, level lists, music, song info) through a local proxy so they always succeed on the first attempt.",
+	"description": "Routes Geometry Dash music/song downloads through a local caching+retrying proxy so they succeed on the first attempt. Level data stays direct (the game's own connection).",
 	"settings": {
 		"proxy-url": {
 			"type": "string",
@@ -15,6 +15,12 @@
 			"description": "Run tools/gdproxy.py (or start-proxy.bat) first, then put the proxy address here, e.g. http://127.0.0.1:8080 . Leave empty to disable.",
 			"default": "",
 			"placeholder": "http://127.0.0.1:8080"
+		},
+		"direct-hosts": {
+			"type": "string",
+			"name": "Direct hosts (no proxy)",
+			"description": "Hosts that bypass the proxy and use the game's own connection. Keep the default (boomlings.com) - Cloudflare trusts the game client but blocks proxies.",
+			"default": "boomlings.com"
 		}
 	}
 }

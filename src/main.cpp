@@ -17,7 +17,15 @@
 // The retry turns "first attempt fails, second succeeds" into "first
 // attempt succeeds". The cache turns repeat downloads into instant hits.
 //
-// The mod itself only sets the environment variables when the user has
+// Important nuance: Geometry Dash's level data server (www.boomlings.com)
+// sits behind Cloudflare, which trusts the game's own HTTP client but
+// blocks scripted proxies. So by default the mod sets NO_PROXY for
+// boomlings.com - level requests keep using the game's direct connection
+// (and the game's own retry), while everything else (music, song info,
+// Newgrounds, leaderboards, etc.) goes through the caching proxy. This
+// "direct-hosts" list is a setting you can change.
+//
+// The mod itself only sets environment variables when the user has
 // configured a proxy-url setting. Empty default = no behaviour change.
 
 #include <Geode/Geode.hpp>
@@ -58,4 +66,13 @@ $on_mod(Loaded) {
     _putenv_s("http_proxy", proxy.c_str());
     _putenv_s("https_proxy", proxy.c_str());
     log::info("GD Proxy Helper: GD traffic routed through {}", proxy);
+    // Hosts that must keep the game's own direct connection (Cloudflare
+    // trusts the game client but blocks proxies). libcurl no_proxy accepts
+    // comma-separated domains; a leading '.' matches subdomains.
+    auto direct = Mod::get()->getSettingValue<std::string>("direct-hosts");
+    if (!direct.empty()) {
+        _putenv_s("NO_PROXY", direct.c_str());
+        _putenv_s("no_proxy", direct.c_str());
+        log::info("GD Proxy Helper: direct hosts (bypass proxy): {}", direct);
+    }
 }

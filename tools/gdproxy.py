@@ -34,19 +34,43 @@ import urllib.request
 CACHE_DIR = None
 RETRIES = 3
 
+# Upstream fetches must NEVER go through the proxy we just injected into the
+# environment (HTTP_PROXY / HTTPS_PROXY). urllib would otherwise send the
+# request right back to us -> infinite loop. Build a no-proxy opener once.
+NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def cache_path(url: str) -> str:
     h = hashlib.sha1(url.encode("utf-8")).hexdigest()
     return os.path.join(CACHE_DIR, h + ".bin")
 
 
-def fetch_with_retry(url: str, timeout: int = 30):
+def upstream_headers(incoming_headers):
+    """Copy the client's headers to the upstream request (UA matters: the
+    boomlings API rejects unknown agents). Strip hop-by-hop headers."""
+    skip = {
+        "connection", "proxy-connection", "proxy-authorization", "keep-alive",
+        "transfer-encoding", "upgrade", "te", "host",
+    }
+    out = {}
+    for k, v in (incoming_headers or {}).items():
+        if k.lower() in skip:
+            continue
+        out[k] = v
+    # Default to a libcurl-ish UA when the client did not send one (that is
+    # what GD itself sends, and the servers accept it).
+    if "User-Agent" not in out:
+        out["User-Agent"] = "libcurl-agent/1.0"
+    return out
+
+
+def fetch_with_retry(url: str, headers=None, timeout: int = 30):
     """Fetch URL, retrying on transient errors. Returns (status, headers, body)."""
     last_err = None
     for attempt in range(1, RETRIES + 1):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "gdproxy/1.0"})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            req = urllib.request.Request(url, headers=upstream_headers(headers))
+            with NO_PROXY_OPENER.open(req, timeout=timeout) as resp:
                 body = resp.read()
                 return resp.status, dict(resp.headers), body
         except urllib.error.HTTPError as e:
@@ -93,7 +117,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             sys.stderr.write("[gdproxy] cache HIT  %s\n" % url)
             return
         try:
-            status, headers, fetched = fetch_with_retry(url)
+            status, headers, fetched = fetch_with_retry(url, headers=self.headers)
         except Exception as e:
             sys.stderr.write("[gdproxy] FAIL %s: %s\n" % (url, e))
             self.send_response(502)
@@ -178,8 +202,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except OSError:
                 body = None
         try:
-            req = urllib.request.Request(url, data=body, method=method, headers={k: v for k, v in self.headers.items() if k.lower() not in ("proxy-authorization",)})
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            req = urllib.request.Request(url, data=body, method=method, headers=upstream_headers(self.headers))
+            with NO_PROXY_OPENER.open(req, timeout=60) as resp:
                 data = resp.read()
                 status = resp.status
                 hdrs = dict(resp.headers)
