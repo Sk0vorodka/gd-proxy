@@ -1,0 +1,20 @@
+{
+	"geode": "5.11.2",
+	"gd": {
+		"win": "*"
+	},
+	"version": "v1.0.0",
+	"id": "artem.gd-proxy",
+	"name": "GD Proxy Helper",
+	"developer": "artem",
+	"description": "Routes all Geometry Dash downloads (levels, level lists, music, song info) through a local proxy so they always succeed on the first attempt.",
+	"settings": {
+		"proxy-url": {
+			"type": "string",
+			"name": "Proxy URL",
+			"description": "Run tools/gdproxy.py (or start-proxy.bat) first, then put the proxy address here, e.g. http://127.0.0.1:8080 . Leave empty to disable.",
+			"default": "",
+			"placeholder": "http://127.0.0.1:8080"
+		}
+	}
+}
